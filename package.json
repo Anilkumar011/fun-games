@@ -5,6 +5,8 @@
   "type": "module",
   "scripts": {
     "start": "node server.mjs",
+    "build": "node scripts/build.mjs",
+    "preview": "npm run build && node scripts/preview.mjs",
     "test": "node --test test/*.test.mjs"
   }
 }

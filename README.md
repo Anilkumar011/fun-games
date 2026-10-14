@@ -11,7 +11,39 @@ cd "/Users/danilkum/Documents/ChatGPT/Fun games"
 npm start
 ```
 
-Open **http://127.0.0.1:4173**. The server binds only to the local computer. Stop it with Ctrl+C in its terminal. For a different port, run `PORT=4174 npm start` and open http://127.0.0.1:4174.
+Open **http://127.0.0.1:4173** on the laptop. Stop the server with Ctrl+C in its terminal. Set `PORT` to choose another port.
+
+### Open on a phone on the same Wi-Fi
+
+The server now binds to `0.0.0.0`, accepting connections from the local network. At startup it prints **Same Wi-Fi / LAN** addresses. Open the address matching the laptop's Wi-Fi adapter on the phone, for example `http://192.168.x.x:4173/`. Use `http://`, and use the laptop's IP rather than `localhost` on the phone. Keep the laptop awake and the server running.
+
+If localhost works but the phone cannot connect, check that both devices are on the same non-guest Wi-Fi, Node is allowed to receive incoming connections in the laptop's firewall, and the network or VPN permits connections between local devices. The server serves only the four public app assets; it does not expose the repository directory. No router port forwarding is needed for same-Wi-Fi use. To restrict the app to the laptop again, run `HOST=127.0.0.1 npm start`.
+
+## GitHub Pages
+
+The simulation is a static site: all movement runs in the visitor's browser. GitHub Pages does not run `server.mjs`. Styles, scripts, module imports, and the home link use relative paths so the app works at both `/` and `/fun-games/`.
+
+### Current repository setup
+
+The source repository is [Anilkumar011/fun-games](https://github.com/Anilkumar011/fun-games), currently private. On 14 October 2026, GitHub rejected Pages activation with: **Your current plan does not support GitHub Pages for this repository.** No public site was activated. GitHub Pages supports public repositories on Free and private repositories on eligible paid plans; see [GitHub's Pages documentation](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
+
+To publish, first choose a public repository for the app, make this repository public, or use an eligible GitHub plan while keeping it private. Repository visibility is a separate choice from the public website; the app has not changed it automatically.
+
+Once the destination supports Pages:
+
+1. Open the repository's **Settings → Pages → Build and deployment** and select **GitHub Actions** as the source.
+2. Open **Actions → Deploy Kite Flock to GitHub Pages → Run workflow**, selecting `main`.
+3. Wait for the `deploy` job to succeed. Its environment link is the actual published website address. A site in the current repository would normally use `https://anilkumar011.github.io/fun-games/`; this is an expected address, not a claim that it is live.
+
+The workflow also runs on pushes to `main`. It tests the simulation and hosting paths, builds `dist/`, and uploads only the four app files plus `.nojekyll`. If Pages is not enabled yet, tests/build still run and deployment is skipped with a setup notice. The source, tests, local server, README, and preview image are excluded from the deployed website artifact. For a separate repository, include this workflow and its supporting source/test/build files, or upload just the contents of `dist/` using that repository's static Pages setup.
+
+### Preview exactly the static site locally
+
+```sh
+npm run preview
+```
+
+Open **http://127.0.0.1:4174/fun-games/**. This serves the generated files under a repository subpath and can run alongside the Wi-Fi server on port 4173. Use Ctrl+C to stop it. `npm run build` recreates the generated `dist/` directory, which is ignored by Git.
 
 ## Motion rules
 
@@ -31,7 +63,7 @@ The count range is **1–600**, capped further by the current canvas area. The e
 npm test
 ```
 
-Six deterministic tests cover heading convergence, cohesion, shared cruising speed, faster catch-up and return to cruise, head-on encounters, bounded movement, a 600-kite dense run, and resizing/count limits. The collision assertions check conservative circular clearances around the visible kite shapes. These are tested numerical safeguards, not a mathematical guarantee for every possible state.
+Seven deterministic tests cover heading convergence, cohesion, shared cruising speed, faster catch-up and return to cruise, head-on encounters, bounded movement, a 600-kite dense run, resizing/count limits, and static HTTP hosting at both the domain root and a repository subpath. Hosting checks validate module MIME types, relative asset links, redirects, and exclusion of non-site files. The collision assertions check conservative circular clearances around the visible kite shapes. These are tested numerical safeguards, not a mathematical guarantee for every possible state.
 
 The app was also checked in a browser at desktop and phone widths, including count presets, count validation, pause/resume, reset, and the adaptive count limit.
 
@@ -42,5 +74,8 @@ The app was also checked in a browser at desktop and phone widths, including cou
 - `flock.mjs`: simulation engine, independent of the browser.
 - `server.mjs`: local static server using Node's standard library.
 - `test/flock.test.mjs`: movement and clearance checks using Node's built-in test runner.
+- `test/hosting.test.mjs`: generated-site and HTTP checks.
+- `scripts/build.mjs`, `scripts/preview.mjs`: static packaging and repository-subpath preview.
+- `.github/workflows/pages.yml`: validation and GitHub Pages deployment.
 
 No remote assets, frameworks, build tools, or third-party packages are used.
