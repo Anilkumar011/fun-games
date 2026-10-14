@@ -3,39 +3,40 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <meta name="theme-color" content="#f5f3eb">
-  <title>Kite Flock — a little collective motion</title>
+  <meta name="theme-color" content="#f4f7f8">
+  <title>Kite Flock — sparrows in motion</title>
   <link rel="stylesheet" href="styles.css">
 </head>
 <body>
   <main class="app">
     <header class="masthead">
       <a class="wordmark" href="./" aria-label="Kite Flock home"><span class="logo" aria-hidden="true"><i></i><i></i><i></i></span>Kite Flock</a>
-      <span class="edition">A STUDY IN COLLECTIVE MOTION <span>№ 01</span></span>
+      <span class="edition">A STUDY IN COLLECTIVE MOTION <span>№ 02</span></span>
     </header>
     <section class="intro">
-      <div><div class="eyebrow">SMALL WINGS. SHARED DIRECTION.</div><h1>A little chaos.<br><em>A natural rhythm.</em></h1></div>
-      <p>Give a few kites room to move.<br> Watch them find their neighbors,<br> keep their distance, and flock together.</p>
+      <div><div class="eyebrow">SMALL WINGS. SHARED DIRECTION.</div><h1>A little freedom.<br><em>One shared sky.</em></h1></div>
+      <p>Set the flock size and the pace.<br> Watch the birds find their neighbors,<br> and make their way together.</p>
     </section>
-    <section class="playground" aria-label="Interactive kite flock simulation">
+    <section class="playground" aria-label="Interactive bird flock simulation">
       <div class="toolbar">
         <form id="count-form">
-          <label for="count">Kites in the air</label>
-          <div class="count-controls"><input id="count" name="count" type="number" min="1" max="600" value="12" inputmode="numeric" required aria-describedby="count-help"><button class="primary" type="submit">Update flock <span aria-hidden="true">↗</span></button></div>
+          <label for="count">Birds in the sky</label>
+          <div class="count-controls"><input id="count" name="count" type="number" min="1" max="1200" value="12" inputmode="numeric" required aria-describedby="count-help"></div>
         </form>
+        <div class="speed-control"><label for="flight-speed">Flight speed <output id="speed-value" for="flight-speed">1.0×</output></label><div class="speed-track"><span>Gentle</span><input id="flight-speed" type="range" min="0.4" max="2.5" step="0.1" value="1" aria-valuetext="1.0 times normal flight speed"><span>Brisk</span></div></div>
         <div class="presets" aria-label="Flock size presets"><button type="button" data-count="12" aria-pressed="true">A few <span>12</span></button><button type="button" data-count="48" aria-pressed="false">A flock <span>48</span></button><button type="button" data-count="120" aria-pressed="false">A crowd <span>120</span></button></div>
         <div class="playback"><button type="button" id="reset" class="icon-button" title="Scatter into a new arrangement" aria-label="Reset arrangement"><span aria-hidden="true">↻</span></button><button type="button" id="pause" aria-pressed="false"><span id="pause-icon" aria-hidden="true">Ⅱ</span> <span id="pause-label">Pause</span></button></div>
       </div>
       <div class="canvas-wrap" id="canvas-wrap">
-        <canvas id="field" role="img" aria-label="Animated kite shapes following nearby neighbors and maintaining separation"></canvas>
+        <canvas id="field" role="img" aria-label="Sparrows with flapping wings flying together across a blue sky"></canvas>
         <div class="field-label"><span class="live-dot"></span><span id="state-label">IN FLIGHT</span></div>
         <div class="field-coordinate" aria-hidden="true">MOVE FREELY. STAY CLOSE.</div>
-        <div class="paused-overlay" id="paused-overlay" hidden>Taking a breather<span>Press Resume to keep flying</span></div>
+        <div class="paused-overlay" id="paused-overlay" hidden>A moment of stillness<span>Press Resume to keep flying</span></div>
       </div>
-      <div class="statusbar"><div class="metrics"><span><b id="live-count">12</b> kites</span><span><b id="group-count">1</b> <span id="groups-label">group</span></span><span><b id="speed">42</b> px/s cruise</span></div><span id="count-help">1–600 kites · one kite-width of breathing room</span></div>
+      <div class="statusbar"><div class="metrics"><span><b id="live-count">12</b> birds</span><span><b id="group-count">1</b> <span id="groups-label">flock</span></span><span><b id="speed">42</b> px/s cruise</span><span id="bird-scale">100% size</span></div><span id="count-help">1–1,200 birds · size adapts to the flock</span></div>
     </section>
     <div class="message" id="message" role="status" aria-live="polite"></div>
-    <footer><div class="rule"><span>01</span><p><strong>Find a heading</strong>Follow the nearest neighbor.</p></div><div class="rule"><span>02</span><p><strong>Make some room</strong>Keep a little space between wings.</p></div><div class="rule"><span>03</span><p><strong>Stay with the flock</strong>Catch up, then settle into the pace.</p></div><span class="footer-note">No destination.<br>Just together.</span></footer>
+    <footer><div class="rule"><span>01</span><p><strong>Find a heading</strong>Follow the nearest neighbor.</p></div><div class="rule"><span>02</span><p><strong>Make some room</strong>Keep a little space between wings.</p></div><div class="rule"><span>03</span><p><strong>Stay with the flock</strong>Gather together. Find a shared pace.</p></div><span class="footer-note">No destination.<br>Just together.</span></footer>
   </main>
   <script type="module" src="app.mjs"></script>
 </body>

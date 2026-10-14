@@ -1,6 +1,8 @@
 # Kite Flock
 
-A small, dependency-free local web playground. Start with 12 moving kite-shaped marks, enter a count and choose **Update flock**, or use the 12 / 48 / 120 presets. **Pause / Resume** freezes and resumes the motion; the circular arrow creates a fresh arrangement at the same count.
+A dependency-free bird-flocking playground over a soft blue sky. Start with 12 sparrow-like birds, type a count or use the number arrows to change it immediately, or choose a 12 / 48 / 120 preset. Existing birds keep their positions when the population changes. The **Flight speed** slider adjusts the pace from **0.4× to 2.5×**, with gradual acceleration and deceleration. **Pause / Resume** eases the animation to a stop and back into flight; the circular arrow starts a fresh arrangement at the same count and selected pace.
+
+![Bird flock over the sky](preview.jpg)
 
 ## Run
 
@@ -45,17 +47,20 @@ npm run preview
 
 Open **http://127.0.0.1:4174/fun-games/**. This serves the generated files under a repository subpath and can run alongside the Wi-Fi server on port 4173. Use Ctrl+C to stop it. `npm run build` recreates the generated `dist/` directory, which is ignored by Git.
 
-## Motion rules
+## Motion rules and limits
 
-- Each kite steers toward its nearest neighbor's heading. Nearby flock headings also provide gentle smoothing.
-- Nearby neighbors exert separation forces. Predictive avoidance and a contact solver keep the enclosing discs of the rendered kites apart, including during catch-up.
-- Local cohesion keeps neighbors close. A kite separated by more than 64 pixels accelerates toward its nearest neighbor and its group, with a small lead to intercept a moving group. It settles back to cruise when it is within 34 pixels.
-- Kites cruise at 42 CSS pixels per second. Returning kites can reach 76, with smooth acceleration and deceleration. Brief positional corrections during close encounters can affect instantaneous displacement.
-- The target neighbor spacing is 24 pixels between centers, approximately one kite-width of clear space. This is a soft target: turns and dense flocks compress the spacing. Each kite fits inside a 7-pixel-radius disc; the contact solver targets 16 pixels between centers.
-- Random initial headings and small continuous steering variations make the motion lively. Groups emerge, split, and reconnect; the group counter uses connected neighbors within 64 pixels. A lone kite counts as one group.
-- Broad edge steering keeps the flock on the canvas, with a final bounded-position constraint as a safeguard.
+- Each bird follows its nearest neighbor's heading, with nearby headings providing gentle smoothing. Angular acceleration and turn-rate limits create gradual banking and turning; wings flap at varied phases.
+- Separation, predictive avoidance, and a contact solver keep conservative circles around the complete wing silhouettes apart, including while catching up.
+- The birds seek one shared flock. Detached smaller groups actively steer toward the main flock, and an elliptical shared boundary discourages stragglers from drifting away. Temporary fragments can appear during turns or count/viewport changes, but they actively rejoin rather than continuing as independent flocks.
+- Group cruise speed is 42 CSS pixels per second at 1.0×, ranging from 16.8 to 105. Catch-up speed adds the greater of 24 pixels per second or 70% of the current cruise speed. This gives stragglers enough closing speed even at the slowest setting. They return to the shared pace after joining. Close-contact positional corrections can briefly affect actual displacement.
+- At full size, birds fit within a 10.5-pixel radius. The solver targets 23 pixels between centers; preferred spacing is 38 pixels. The **same adaptive scale** applies to bird geometry, clearance, preferred spacing, and neighbor ranges. Preferred spacing is a soft target during dense turns.
+- Broad edge steering keeps the flock visible, with a final bounded-position constraint as a safeguard.
 
-The count range is **1–600**, capped further by the current canvas area. The exact limit is displayed beneath the field. A smaller window can reduce the count; the app explains when that happens. Dense populations cost more CPU and can run more slowly on older devices. Long browser stalls drop excess elapsed time instead of letting kites leap through one another. Motion pauses while the page is hidden, and starts paused when the operating system requests reduced motion.
+The limits are **1–1,200 birds in desktop views** and **1–300 in phone-sized views**, without an additional area-based count cap. Phone-sized means a viewport narrower than 768 pixels, or narrower than 1,000 pixels and shorter than 500 pixels (including landscape phones). When resizing from desktop to a phone-sized view, the first 300 birds are retained and a message explains the change.
+
+As density rises, birds and their clearance distances shrink together to fit the available sky. Lower-count birds retain their full-size wing/body cues; at maximum counts the birds intentionally become small silhouettes. The status bar shows the current scale. Returning to a smaller population eases sizes back up without resetting the surviving birds.
+
+Valid count edits apply immediately. Empty, fractional, or out-of-range edits leave the existing flock flying; leaving the field restores the last active count if the edit is still invalid. Numeric spatial grids keep neighbor lookup and collision work local. Actual frame rates depend on the device; dense flocks can be slower on older phones. Long browser stalls drop excess elapsed time rather than teleporting birds through one another. Motion pauses while the page is hidden and starts paused when the operating system requests reduced motion.
 
 ## Verify
 
@@ -63,9 +68,9 @@ The count range is **1–600**, capped further by the current canvas area. The e
 npm test
 ```
 
-Seven deterministic tests cover heading convergence, cohesion, shared cruising speed, faster catch-up and return to cruise, head-on encounters, bounded movement, a 600-kite dense run, resizing/count limits, and static HTTP hosting at both the domain root and a repository subpath. Hosting checks validate module MIME types, relative asset links, redirects, and exclusion of non-site files. The collision assertions check conservative circular clearances around the visible kite shapes. These are tested numerical safeguards, not a mathematical guarantee for every possible state.
+Nine deterministic tests cover desktop/mobile caps, incremental count changes and survivor identity, invalid editing states, smooth turning and speed changes, shared cruising speed, catch-up at slow and fast paces, deliberate group merging, head-on clearance, 1,200/300-bird stress runs through speed changes, viewport changes, and static HTTP hosting under both the domain root and a repository subpath. Hosting checks validate module MIME types, relative asset links, redirects, and exclusion of non-site files. Collision checks use conservative circles around the full wings; these are tested numerical safeguards, not a mathematical guarantee for every possible state.
 
-The app was also checked in a browser at desktop and phone widths, including count presets, count validation, pause/resume, reset, and the adaptive count limit.
+Browser checks include immediate 100→101 input-arrow changes, empty/out-of-range editing, both speed-slider endpoints, desktop/mobile maxima, responsive layouts, and pause/resume. Maximum-count playback is checked on the development laptop in desktop and phone-sized viewports; this does not substitute for performance testing on every physical phone.
 
 ## Files
 
