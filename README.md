@@ -25,15 +25,15 @@ The simulation is a static site: all movement runs in the visitor's browser. Git
 
 ### Current repository setup
 
-The source repository is [Anilkumar011/fun-games](https://github.com/Anilkumar011/fun-games), currently private. On 14 October 2026, GitHub rejected Pages activation with: **Your current plan does not support GitHub Pages for this repository.** No public site was activated. GitHub Pages supports public repositories on Free and private repositories on eligible paid plans; see [GitHub's Pages documentation](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages).
+The source repository is [Anilkumar011/fun-games](https://github.com/Anilkumar011/fun-games), and it is public. GitHub Pages is configured with GitHub Actions, and the published app is **[https://anilkumar011.github.io/fun-games/](https://anilkumar011.github.io/fun-games/)**. Anyone can open this HTTPS link on a phone or computer; the laptop server does not need to be running.
 
-To publish, first choose a public repository for the app, make this repository public, or use an eligible GitHub plan while keeping it private. Repository visibility is a separate choice from the public website; the app has not changed it automatically.
-
-Once the destination supports Pages:
+To configure Pages again or set up a fork:
 
 1. Open the repository's **Settings → Pages → Build and deployment** and select **GitHub Actions** as the source.
 2. Open **Actions → Deploy Kite Flock to GitHub Pages → Run workflow**, selecting `main`.
-3. Wait for the `deploy` job to succeed. Its environment link is the actual published website address. A site in the current repository would normally use `https://anilkumar011.github.io/fun-games/`; this is an expected address, not a claim that it is live.
+3. Wait for the `deploy` job to succeed. Its environment link is the published website address for that repository.
+
+GitHub Pages supports public repositories on Free and private repositories on eligible paid plans; see [GitHub's Pages documentation](https://docs.github.com/en/pages/getting-started-with-github-pages/using-custom-workflows-with-github-pages). A fork kept private must have an eligible plan before enabling Pages.
 
 The workflow also runs on pushes to `main`. It tests the simulation and hosting paths, builds `dist/`, and uploads only the four app files plus `.nojekyll`. If Pages is not enabled yet, tests/build still run and deployment is skipped with a setup notice. The source, tests, local server, README, and preview image are excluded from the deployed website artifact. For a separate repository, include this workflow and its supporting source/test/build files, or upload just the contents of `dist/` using that repository's static Pages setup.
 
