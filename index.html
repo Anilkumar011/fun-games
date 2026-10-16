@@ -11,7 +11,7 @@
   <main class="app">
     <header class="masthead">
       <a class="wordmark" href="./" aria-label="Kite Flock home"><span class="logo" aria-hidden="true"><i></i><i></i><i></i></span>Kite Flock</a>
-      <span class="edition">A STUDY IN COLLECTIVE MOTION <span>№ 02</span></span>
+      <span class="edition">A STUDY IN COLLECTIVE MOTION <span>№ 03</span></span>
     </header>
     <section class="intro">
       <div><div class="eyebrow">SMALL WINGS. SHARED DIRECTION.</div><h1>A little freedom.<br><em>One shared sky.</em></h1></div>
@@ -28,12 +28,14 @@
         <div class="playback"><button type="button" id="reset" class="icon-button" title="Scatter into a new arrangement" aria-label="Reset arrangement"><span aria-hidden="true">↻</span></button><button type="button" id="pause" aria-pressed="false"><span id="pause-icon" aria-hidden="true">Ⅱ</span> <span id="pause-label">Pause</span></button></div>
       </div>
       <div class="canvas-wrap" id="canvas-wrap">
-        <canvas id="field" role="img" aria-label="Sparrows with flapping wings flying together across a blue sky"></canvas>
+        <canvas id="field" role="img" aria-label="A perspective view of shaded birds banking and flapping within a bounded sky scene"></canvas>
+        <canvas id="birds-3d" aria-hidden="true"></canvas>
         <div class="field-label"><span class="live-dot"></span><span id="state-label">IN FLIGHT</span></div>
+        <button type="button" id="view-toggle" aria-label="3D perspective" title="Compare 3D birds with the original 2D view; flight stays the same" aria-pressed="true">◇ 3D view</button>
         <div class="field-coordinate" aria-hidden="true">MOVE FREELY. STAY CLOSE.</div>
         <div class="paused-overlay" id="paused-overlay" hidden>A moment of stillness<span>Press Resume to keep flying</span></div>
       </div>
-      <div class="statusbar"><div class="metrics"><span><b id="live-count">12</b> birds</span><span><b id="group-count">1</b> <span id="groups-label">flock</span></span><span><b id="speed">42</b> px/s cruise</span><span id="bird-scale">100% size</span></div><span id="count-help">1–1,200 birds · size adapts to the flock</span></div>
+      <div class="statusbar"><div class="metrics"><span><b id="live-count">12</b> birds</span><span><b id="group-count">1</b> <span id="groups-label">flock</span></span><span><b id="speed">1.0</b>× pace</span><span id="bird-scale">100% size</span></div><span id="count-help">1–1,200 birds · size adapts to the flock</span></div>
     </section>
     <div class="message" id="message" role="status" aria-live="polite"></div>
     <footer><div class="rule"><span>01</span><p><strong>Find a heading</strong>Follow the nearest neighbor.</p></div><div class="rule"><span>02</span><p><strong>Make some room</strong>Keep a little space between wings.</p></div><div class="rule"><span>03</span><p><strong>Stay with the flock</strong>Gather together. Find a shared pace.</p></div><span class="footer-note">No destination.<br>Just together.</span></footer>

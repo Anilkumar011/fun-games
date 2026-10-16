@@ -107,7 +107,11 @@ test('maximum desktop and mobile flocks remain safe through speed changes',t=>{
     const start=performance.now();
     for(const multiplier of [1,2.5,.4]){f.setSpeed(multiplier);advance(f,5,60);}
     t.diagnostic(`${count} birds: ${(performance.now()-start).toFixed(0)} ms for 15 simulated seconds including independent clearance checks; scale ${f.scale.toFixed(3)}`);
-    assert.equal(f.birds.length,count);assert.equal(f.groups.length,1);
+    assert.equal(f.birds.length,count);
+    // Avoiding a predicted encounter can briefly detach a bird. It must rejoin
+    // once the speed transition has settled, without relaxing clearance.
+    for(let seconds=0;f.groups.length>1&&seconds<10;seconds++)advance(f,1,60);
+    assert.equal(f.groups.length,1,'yielding birds must gather again');
   }
 });
 

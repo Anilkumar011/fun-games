@@ -13,7 +13,7 @@ test('the deployable site works at both a domain root and a repository subpath',
   try {
     await buildSite(directory);
     assert.deepEqual((await readdir(directory)).sort(),
-      ['.nojekyll', 'app.mjs', 'flock.mjs', 'index.html', 'styles.css']);
+      ['.nojekyll', 'app.mjs', 'bird-model.mjs', 'flock.mjs', 'index.html', 'renderer-3d.mjs', 'renderer.mjs', 'styles.css', 'vendor']);
     for (const basePath of ['/', '/fun-games/']) {
       const server = createStaticServer({ directory, basePath });
       server.listen(0, '127.0.0.1');
@@ -30,7 +30,7 @@ test('the deployable site works at both a domain root and a repository subpath',
           assert.ok(resource.pathname.startsWith(basePath), `${reference} must stay under the site subpath`);
           assert.equal((await fetch(resource)).status, 200, reference);
         }
-        for (const file of ['app.mjs', 'flock.mjs']) {
+        for (const file of ['app.mjs', 'flock.mjs', 'renderer.mjs', 'renderer-3d.mjs', 'bird-model.mjs', 'vendor/three.module.min.js']) {
           const resource = new URL(file, home);
           const response = await fetch(resource);
           assert.match(response.headers.get('content-type'), /text\/javascript/);

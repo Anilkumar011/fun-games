@@ -8,6 +8,10 @@ export const MAX_COUNT = 1200;
 export const MOBILE_MAX_COUNT = 300;
 export const MARGIN = 24;
 export const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
+const boundaryRisk=(distance,outward,buffer)=>Math.max(
+  outward>1?clamp(1-(distance-buffer)/outward/1.6,0,1):0,
+  clamp(1-distance/buffer,0,1)
+);
 const difference = (a, b) => Math.atan2(Math.sin(a - b), Math.cos(a - b));
 export const capacityForViewport = (width, height) => width < 768 || (width < 1000 && height < 500) ? MOBILE_MAX_COUNT : MAX_COUNT;
 export function parseCount(value, maximum) {
@@ -47,7 +51,7 @@ export class Flock {
     this.capacity = capacity; this.random = random;
     this.birds = []; this.groups = []; this.time = 0; this.nextId = 0;
     this.speedMultiplier = 1; this.cruiseSpeed = CRUISE_SPEED;
-    this.grid = new Grid(); this.contactGrid = new Grid();
+    this.grid = new Grid(); this.contactGrid = new Grid(); this.safetyGrid = new Grid();
     this.scale = 1; this.targetScale = 1;
     this.reset(count);
   }
@@ -71,7 +75,7 @@ export class Flock {
       catchingUp: false, group: 0, mergeX: 0, mergeY: 0, merging: false };
   }
   reset(count = this.birds.length) {
-    this.birds = []; this.time = 0;
+    this.birds = []; this.time = 0;this.nextAnticipation=0;
     this.scale = this.desiredScale(clamp(Math.round(count) || 1, 1, this.capacity));
     this.setCount(count);
   }
@@ -216,6 +220,102 @@ export class Flock {
     }
   }
 
+  anticipate() {
+    // Look ahead in time, independently of the original flocking neighborhood.
+    // Small birds at high population still need time to react at the same pace.
+    // Closest-approach prediction: https://www.red3d.com/cwr/steer/Unaligned.html
+    const birds=this.birds,horizon=1.2,comfort=this.minDistance*1.15;
+    const range=Math.max(60,120*this.scale,this.cruiseSpeed*1.4+this.minDistance),range2=range*range;
+    this.safetyGrid.build(birds,this.width,this.height,range);
+    const {head,next,columns,rows}=this.safetyGrid;
+    for(const b of birds){
+      b.threatTime=Infinity;b.threatRisk=0;
+      b.future ||= new Float64Array(12);
+      // A turning neighbor will not continue along its current tangent.
+      for(let k=0;k<6;k++){
+        const t=(k+1)*.2,w=b.turn;
+        b.future[k*2]=Math.abs(w)<.01?b.vx*t:b.speed*(Math.sin(b.angle+w*t)-Math.sin(b.angle))/w;
+        b.future[k*2+1]=Math.abs(w)<.01?b.vy*t:b.speed*(Math.cos(b.angle)-Math.cos(b.angle+w*t))/w;
+      }
+    }
+    const warn=(a,b,dx,dy,px,py,time,risk)=>{
+      if(dx*a.headingX+dy*a.headingY < -this.minDistance*.5 || time>=a.threatTime)return;
+      a.threatTime=time;a.threatRisk=risk;
+      if(a.avoidBird!==b.id){
+        const side=a.headingX*py-a.headingY*px;
+        a.avoidSide=Math.abs(side)>.1 ? -Math.sign(side) : 1;
+        a.avoidBird=b.id;
+      }
+      a.threatAngle=a.angle+a.avoidSide*Math.atan2(comfort,Math.max(comfort,Math.hypot(dx,dy)*.6));
+    };
+    for(let i=0;i<birds.length;i++){
+      const a=birds[i],cx=Math.floor(a.x/range),cy=Math.floor(a.y/range);
+      for(let gy=Math.max(0,cy-1);gy<=Math.min(rows-1,cy+1);gy++)for(let gx=Math.max(0,cx-1);gx<=Math.min(columns-1,cx+1);gx++){
+        for(let j=head[gx+gy*columns];j!==-1;j=next[j]){
+          if(j<=i)continue;
+          const b=birds[j],dx=b.x-a.x,dy=b.y-a.y,d2=dx*dx+dy*dy;
+          if(d2>range2)continue;
+          const vx=b.vx-a.vx,vy=b.vy-a.vy,v2=vx*vx+vy*vy,closing=dx*vx+dy*vy;
+          if(closing>=0||v2<4)continue;
+          let entry=Infinity,px=0,py=0;
+          const time=-closing/v2;
+          if(time>0&&time<=horizon){
+            const lx=dx+vx*time,ly=dy+vy*time,miss2=lx*lx+ly*ly;
+            if(miss2<comfort*comfort){entry=Math.max(0,time-Math.sqrt((comfort*comfort-miss2)/v2));px=lx;py=ly;}
+          }
+          let lastX=dx,lastY=dy;
+          for(let k=0;k<6&&k*.2<entry;k++){
+            const x=dx+b.future[k*2]-a.future[k*2],y=dy+b.future[k*2+1]-a.future[k*2+1];
+            const sx=x-lastX,sy=y-lastY,segment2=sx*sx+sy*sy;
+            const fraction=clamp(-(lastX*sx+lastY*sy)/(segment2||1),0,1);
+            const qx=lastX+sx*fraction,qy=lastY+sy*fraction;
+            if(qx*qx+qy*qy<comfort*comfort){entry=(k+fraction)*.2;px=qx;py=qy;}
+            lastX=x;lastY=y;
+          }
+          if(!Number.isFinite(entry))continue;
+          const risk=clamp(1-entry/horizon,0,1);
+          warn(a,b,dx,dy,px,py,entry,risk);
+          warn(b,a,-dx,-dy,-px,-py,entry,risk);
+        }
+      }
+    }
+  }
+
+  avoid(b,heading,dt) {
+    let risk=b.threatRisk||0,angle=b.threatAngle;
+    // Predict arrival at each wall. Only an approaching bird needs to yield;
+    // flying parallel to a boundary must not put the whole flock on an orbit.
+    const buffer=this.radius+12;
+    // Keep a small clearance band active until the bird has actually left it.
+    // Becoming momentarily parallel must not release the turn back into a wall.
+    const left=boundaryRisk(b.x-MARGIN,-b.vx,buffer);
+    const right=boundaryRisk(this.width-MARGIN-b.x,b.vx,buffer);
+    const top=boundaryRisk(b.y-MARGIN,-b.vy,buffer);
+    const bottom=boundaryRisk(this.height-MARGIN-b.y,b.vy,buffer);
+    let nx=left-right,ny=top-bottom;
+    const wallRisk=Math.max(left,right,top,bottom);
+    if(wallRisk>0 && (wallRisk>=risk || wallRisk>.2)){
+      const length=Math.hypot(nx,ny)||1;nx/=length;ny/=length;
+      const tx=-ny,ty=nx;
+      let side=b.wallSide ?? Math.sign(tx*b.headingX+ty*b.headingY);
+      if(b.wallSide===undefined && Math.abs(tx*b.headingX+ty*b.headingY)<.2){
+        const preferred=difference(heading,b.angle);
+        side=Math.sign(preferred*(b.headingX*ty-b.headingY*tx))||1;
+      }
+      b.wallSide=side||1;
+      angle=Math.atan2(ny*.7+ty*b.wallSide,nx*.7+tx*b.wallSide);risk=wallRisk;
+    }
+    if(wallRisk===0)b.wallSide=undefined;
+    if(risk>0)b.safetyAngle=angle;
+    else b.avoidBird=undefined;
+    b.safetyRisk=(b.safetyRisk||0)+clamp(risk-(b.safetyRisk||0),-dt*2.5,dt*5);
+    const blend=clamp(b.safetyRisk*1.4,0,1);
+    return {
+      heading:blend?heading+difference(b.safetyAngle,heading)*blend:heading,
+      pace:1-b.safetyRisk*.55
+    };
+  }
+
   step(dt) {
     if(!Number.isFinite(dt)||dt<=0)return;
     if(dt>1/120+1e-9) {
@@ -227,6 +327,9 @@ export class Flock {
     this.cruiseSpeed+=clamp(this.speedMultiplier*CRUISE_SPEED-this.cruiseSpeed,-50*dt,50*dt);
     this.scale+=Math.min(this.targetScale-this.scale,dt*.15);
     this.measure();
+    if(this.time >= (this.nextAnticipation || 0)){
+      this.anticipate();this.nextAnticipation=this.time+1/20;
+    }
     const turnLimit=2.1*Math.sqrt(this.cruiseSpeed/CRUISE_SPEED);
     for(const b of this.birds) {
       const nearest=this.birds[b.nearest];
@@ -263,10 +366,13 @@ export class Flock {
       const wall=d=>Math.max(0,1-d/wallRange)**2*11;
       sx+=wall(b.x-MARGIN)-wall(this.width-MARGIN-b.x);
       sy+=wall(b.y-MARGIN)-wall(this.height-MARGIN-b.y);
-      const wanted=clamp(difference(Math.atan2(sy,sx),b.angle)*3,-turnLimit,turnLimit);
+      const avoidance=this.avoid(b,Math.atan2(sy,sx),dt);
+      const wanted=clamp(difference(avoidance.heading,b.angle)*3,-turnLimit,turnLimit);
       b.turn+=clamp(wanted-b.turn,-9*dt,9*dt);
       b.nextAngle=b.angle+b.turn*dt;
-      const target=(b.catchingUp||b.merging)?this.catchupSpeed:this.cruiseSpeed;
+      const freeSpeed=(b.catchingUp||b.merging)?this.catchupSpeed:this.cruiseSpeed;
+      // Yielding cancels catch-up thrust before the gap becomes crowded.
+      const target=(b.safetyRisk>.001?Math.min(freeSpeed,this.cruiseSpeed):freeSpeed)*avoidance.pace;
       b.nextSpeed=b.speed+clamp(target-b.speed,-85*dt,65*dt);
     }
     for(const b of this.birds) {
@@ -305,8 +411,7 @@ export class Flock {
     }
     for(const b of birds) {
       b.x=clamp(b.x,MARGIN,this.width-MARGIN);b.y=clamp(b.y,MARGIN,this.height-MARGIN);
-      if((b.x<=MARGIN&&b.vx<0)||(b.x>=this.width-MARGIN&&b.vx>0))b.vx*=-1;
-      if((b.y<=MARGIN&&b.vy<0)||(b.y>=this.height-MARGIN&&b.vy>0))b.vy*=-1;
+      // The safety clamp never reverses a heading; anticipation turns the bird.
       b.angle=Math.atan2(b.vy,b.vx);
     }
   }

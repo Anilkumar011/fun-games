@@ -6,7 +6,8 @@ const root = fileURLToPath(new URL('../', import.meta.url));
 export async function buildSite(destination = path.join(root, 'dist')) {
   await rm(destination, { recursive: true, force: true });
   await mkdir(destination, { recursive: true });
-  for (const file of ['index.html', 'styles.css', 'app.mjs', 'flock.mjs']) {
+  for (const file of ['index.html', 'styles.css', 'app.mjs', 'flock.mjs', 'renderer.mjs', 'renderer-3d.mjs', 'bird-model.mjs', 'vendor/three.module.min.js', 'vendor/THREE-LICENSE.txt']) {
+    await mkdir(path.dirname(path.join(destination,file)),{recursive:true});
     await cp(path.join(root, file), path.join(destination, file));
   }
   await writeFile(path.join(destination, '.nojekyll'), '');

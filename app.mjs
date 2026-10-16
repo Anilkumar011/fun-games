@@ -1,4 +1,6 @@
-import { Flock, capacityForViewport, parseCount, clamp } from './flock.mjs';
+import { Flock, CRUISE_SPEED, capacityForViewport, parseCount, clamp } from './flock.mjs';
+import { renderScene } from './renderer.mjs';
+import { BirdRenderer } from './renderer-3d.mjs';
 
 const canvas=document.querySelector('#field');
 const wrap=document.querySelector('#canvas-wrap');
@@ -7,8 +9,14 @@ const countInput=document.querySelector('#count');
 const speedInput=document.querySelector('#flight-speed');
 const message=document.querySelector('#message');
 const pauseButton=document.querySelector('#pause');
-const palette=[['#79614e','#51483f','#b39d7d'],['#827a70','#514c47','#bab2a1'],['#9c8161','#62503d','#cfb99b'],['#66594d','#3e3933','#a8957e'],['#9b9183','#62594d','#c7b9a3']];
 let flock;
+const gpuCanvas=document.querySelector('#birds-3d');
+let birdRenderer;
+try{birdRenderer=new BirdRenderer(gpuCanvas);}catch(error){
+  console.warn('WebGL unavailable; using the Canvas bird view.',error.message);
+  gpuCanvas.hidden=true;
+}
+let perspective=true;
 let paused=matchMedia('(prefers-reduced-motion: reduce)').matches;
 let motionFactor=paused?0:1;
 let previousTime=0,accumulator=0,lastStats=0;
@@ -18,7 +26,7 @@ function updateStats() {
   document.querySelector('#live-count').textContent=flock.birds.length.toLocaleString();
   document.querySelector('#group-count').textContent=flock.groups.length;
   document.querySelector('#groups-label').textContent=flock.groups.length===1?'flock':'groups gathering';
-  document.querySelector('#speed').textContent=Math.round(flock.cruiseSpeed);
+  document.querySelector('#speed').textContent=(flock.cruiseSpeed/CRUISE_SPEED).toFixed(1);
   document.querySelector('#bird-scale').textContent=`${Math.round(flock.scale*100)}% size`;
 }
 function syncControls(writeCount=true) {
@@ -35,33 +43,23 @@ function resize() {
   const capacity=capacityForViewport(innerWidth,innerHeight);
   if(!flock)flock=new Flock(bounds.width,bounds.height,12,Math.random,capacity);
   else if(flock.resize(bounds.width,bounds.height,capacity))message.textContent='Phone-sized views allow up to 300 birds. The first 300 keep flying.';
+  birdRenderer?.resize(bounds.width,bounds.height,ratio);
   syncControls(document.activeElement!==countInput);render();
 }
 function render() {
-  context.clearRect(0,0,flock.width,flock.height);
-  for(const b of flock.birds) {
-    const colors=palette[b.id%palette.length];
-    const flap=.6+.4*Math.sin(b.wingPhase+b.phase);
-    const wing=4.1+flap*4.7;
-    context.save();context.translate(b.x,b.y);context.rotate(b.angle);
-    context.scale(flock.scale,flock.scale*(1-Math.min(.13,Math.abs(b.turn)*.045)));
-    // Rounded swept wings, tapered tail, body, head, and a warm feather highlight.
-    context.fillStyle=colors[0];context.beginPath();
-    context.moveTo(2,0);
-    context.quadraticCurveTo(1,-wing*.8,-4,-wing);
-    context.quadraticCurveTo(-4.9,-wing*.45,-3,0);
-    context.quadraticCurveTo(-4.9,wing*.45,-4,wing);
-    context.quadraticCurveTo(1,wing*.8,2,0);context.fill();
-    context.fillStyle=colors[1];context.beginPath();
-    context.moveTo(-3,0);context.lineTo(-8,-2.1);context.lineTo(-7.2,0);context.lineTo(-8,2.1);context.closePath();context.fill();
-    context.beginPath();context.ellipse(-.3,0,4.8,1.8,0,0,Math.PI*2);context.fill();
-    context.beginPath();context.arc(3.7,0,2,0,Math.PI*2);context.fill();
-    context.fillStyle=colors[2];context.beginPath();
-    context.ellipse(-.7,-.5,3.1,.65,0,0,Math.PI*2);context.fill();
-    context.fillStyle='#bc9b6c';context.beginPath();context.moveTo(5,-.65);context.lineTo(7,0);context.lineTo(5,.65);context.fill();
-    context.restore();
-  }
+  const gpu=perspective&&!!birdRenderer;
+  renderScene(context,flock,perspective,gpu);
+  gpuCanvas.hidden=!gpu;
+  if(gpu)birdRenderer.render(flock);
+  canvas.dataset.view=perspective?'3d':'original-2d';
 }
+document.querySelector('#view-toggle').addEventListener('click',()=>{
+  perspective=!perspective;
+  const button=document.querySelector('#view-toggle');
+  button.setAttribute('aria-pressed',perspective);
+  button.textContent=perspective?'◇ 3D view':'◇ Original 2D';
+  render();
+});
 function setPaused(value) {
   paused=value;
   pauseButton.setAttribute('aria-pressed',paused);
