@@ -14,3 +14,8 @@ footer{display:flex;gap:clamp(25px,5.5vw,86px);align-items:flex-start;padding:12
 #view-toggle{position:absolute;right:18px;top:15px;border:1px solid #ffffff85;background:#f6fbff70;backdrop-filter:blur(8px);color:#547889;font-size:10px;letter-spacing:.3px;padding:8px 11px}#view-toggle:hover{background:#f6fbffb0}
 
 #birds-3d{position:absolute;inset:0;pointer-events:none}#birds-3d[hidden]{display:none}
+.word-toolbar{display:flex;align-items:center;flex-wrap:wrap;gap:10px;padding:12px 21px;border-top:1px solid var(--line)}
+.word-toolbar input{width:112px;min-width:0;border:1px solid #d6e1e6;border-radius:6px;padding:9px 10px;background:#fff;color:#456879;font:12px inherit;letter-spacing:1.5px;text-transform:uppercase}
+.word-toolbar input[aria-invalid=true]{border-color:#b17b56}.word-toolbar button{padding:8px 12px}.word-toolbar button:disabled{opacity:.45;cursor:default}.word-toolbar [hidden]{display:none}
+#word-help,#word-status{font-size:10px;color:#7b929e}#word-status{margin-left:auto;color:#547889}#word-help.error{color:#9a6543}
+@media(max-width:600px){.word-toolbar{gap:8px;padding:12px 14px}.word-toolbar label{width:100%}.word-toolbar input{flex:1;width:80px}.word-toolbar button{font-size:11px;padding:9px 10px}#word-help{width:100%;font-size:9px}#word-status{margin-left:0;width:100%}#word-status:empty{display:none}}

@@ -1,8 +1,18 @@
 # Kite Flock
 
-A bird-flocking playground inside a finite sky scene, with a fixed perspective camera, shaded rounded bodies, articulated wings, and gentle banking. The view button switches between **3D view** and **Original 2D** during the same flight. Nearest-neighbor flocking and size rules use `c49cd89` as their baseline, with predictive slowing and turning added near birds and boundaries. The 3D view uses a locally bundled Three.js renderer. Start with 12 sparrow-like birds, type a count or use the number arrows to change it immediately, or choose a 12 / 48 / 120 preset. Existing birds keep their positions when the population changes. The **Flight speed** slider adjusts the pace from **0.4× to 2.5×**, with gradual acceleration and deceleration. **Pause / Resume** eases the animation to a stop and back into flight; the circular arrow starts a fresh arrangement at the same count and selected pace.
+A bird-flocking playground inside a finite sky scene, with a fixed perspective camera, shaded rounded bodies, articulated wings, and gentle banking. The view button switches between **3D view** and **Original 2D** during the same flight. Nearby birds share headings and turning momentum, while separated groups actively rejoin and anticipate approaching birds and boundaries. The 3D view uses a locally bundled Three.js renderer. Start with 12 sparrow-like birds, type a count or use the number arrows to change it immediately, or choose a 12 / 48 / 120 preset. Existing birds keep their positions when the population changes. The **Flight speed** slider adjusts the pace from **0.4× to 2.5×**, with gradual acceleration and deceleration. **Pause / Resume** eases the animation to a stop and back into flight; the circular arrow starts a fresh arrangement at the same count and selected pace.
 
 ![Bird flock over the sky](preview.jpg)
+
+## Sky letters
+
+Enter any **one to six letters (A–Z)** and press **Form word**. Birds fly toward positions in a small offline 5×7 alphabet. Once the word is readable, it glides gently for **five seconds of readable simulation time**, then releases into normal flocking. Arrival time is separate from the display time. Pause also pauses that clock; **Release** ends the lettering early.
+
+If needed, extra birds fade in temporarily. The number field keeps the selected count, while the status bar shows the actual number flying. Spare birds fly in clear areas above and below the word. Temporary birds fade out after release and the original birds remain. Letter mode can shrink birds further to leave space between its points, especially for six letters on a phone; normal density sizing returns afterward.
+
+A new word replaces the current targets without moving birds instantly. Changing the selected count begins release and restores that selection; increases add birds immediately, while removals finish their fade over about three seconds. Reset cancels lettering and starts a fresh arrangement. Resizing rebuilds the word for the new view and restarts its arrival/hold clock. Empty, nonletter, and overlong inputs are validated without interrupting flight.
+
+![A word formed by the birds](formation-preview.jpg)
 
 ## Run
 
@@ -49,12 +59,14 @@ Open **http://127.0.0.1:4174/fun-games/**. This serves the generated files under
 
 ## Motion rules and limits
 
-- Nearest-neighbor following, local alignment/cohesion/separation, group gathering, placement and density sizing retain the `c49cd89` baseline. A new safety layer changes reactions to predicted encounters and approaching boundaries; paths near those threats intentionally differ from the historical commit.
-- The original density scaling uses the full available scene area. There is no extra reduction for a compact formation or circular route. At 1,100 × 470 scene pixels, both 12 and 48 birds remain at 100% size; 1,200 use approximately 36% size, exactly as before.
+- Ordinary flight coordinates several nearby neighbors and carries their turning momentum through a damped steering response. It has no shared prescribed route or synchronized wingbeats. This lightweight model takes inspiration from [Attanasi et al., information transfer and behavioural inertia in starling flocks](https://www.nature.com/articles/nphys3035); it is not a reproduction of their measured model.
+- Detached groups track closing progress toward the main flock and choose a wider intercept if progress stalls. The main flock follows its own local center, so it does not have to visit a corner to collect a pair. Intercept prediction is limited so it cannot project past the pursuing birds and send them away from their target.
+- Ordinary flight retains the `c49cd89` density sizing over the full scene area. At 1,100 × 470 scene pixels, both 12 and 48 birds remain at 100% size; 1,200 use approximately 36% size. Temporary lettering has its own spacing constraint and restores normal sizing afterward.
 - Cruise speed remains 42 scene pixels per second at 1.0×, ranging from 16.8 to 105. Detached birds use the original catch-up speed and return to cruise after rejoining. The finite boundary remains. Anticipation predicts straight and turning neighbor paths 1.2 seconds ahead, and arrival at a wall 1.6 seconds ahead. A threatened bird eases its speed, cancels catch-up thrust, and turns with bounded angular acceleration. Boundary threats take priority when needed; a committed turn side prevents indecision at an edge. Emergency contact projection remains for unavoidable crowded starts or sudden resize, but walls no longer instantly reverse a bird’s heading.
 - Rendering reads simulation state without modifying positions, headings, scale, or bird order. A fixed camera shows forward travel. Switching to Original 2D draws the original bird shapes while the same simulation continues.
 - The WebGL 3D renderer uses a custom sparrow model with a rounded chest/head, cheek/eye/beak detail, layered cambered feathers, a textured feather material, and sun/sky lighting. Three wing segments per side animate the shoulder, elbow and wrist; the tail fans during braking. Eight shared instanced meshes render every population without reducing model size or replacing the birds with low-detail triangles. A Canvas renderer remains available if WebGL cannot initialize. It derives the bank pose from speed and turn rate using the coordinated-turn relationship `tan(bank) = speed × turnRate / gravity`. The rendering gravity is calibrated in scene units for the original animation pace. See [NASA’s explanation of banking and lift](https://www1.grc.nasa.gov/beginners-guide-to-aeronautics/banking-turns/).
 - Wing effort increases during catch-up and banked turns, with gliding between flapping bursts. These are visual flight cues layered over the approved flocking; the scene does not solve a full aerodynamic model. The original paths remain in their horizontal plane, while body and wing geometry have actual depth.
+- Letter targets temporarily replace flock cohesion and group-merging targets, while turn/speed limits and collision safety remain active. Nearby assignment reduces crossing paths; occupied slots stay fixed while a nearer bird can fill a stalled open slot. The readable-time clock requires at least 96% of birds close to their slots and spare birds outside the word. This is a stylized slow-flight display, not physically exact fixed-wing hovering or a full three-dimensional collision simulation.
 
 The limits are **1–1,200 birds in desktop views** and **1–300 in phone-sized views**, without an additional area-based count cap. Phone-sized means a viewport narrower than 768 pixels, or narrower than 1,000 pixels and shorter than 500 pixels (including landscape phones). When resizing from desktop to a phone-sized view, the first 300 birds are retained and a message explains the change.
 
@@ -68,7 +80,7 @@ Valid count edits apply immediately. Empty, fractional, or out-of-range edits le
 npm test
 ```
 
-The 17 automated tests cover counts, identity, speed transitions, gathering, clearance, resizing, rendering and hosting. Avoidance tests exercise head-on/crossing/catch-up approaches and all four walls/corners, checking actual displacement, bounded turn/speed changes and clearance without position corrections in those scenarios. Rendering tests check historical sizing, read-only rendering, bank poses and articulated GPU transforms. The hosting test verifies root and repository-subpath deployments, including vendored assets.
+The automated tests cover counts, identity, speed transitions, gathering, clearance, resizing, rendering and hosting. Avoidance tests exercise head-on/crossing/catch-up approaches and all four walls/corners, checking actual displacement, bounded turn/speed changes and clearance without position corrections in those scenarios. Coordination tests exercise a corner pair while the main group remains far away, and local turn propagation. Formation tests cover arbitrary letters, continuous arrival, readable hold timing, temporary-bird fades, maximum-count spare birds, and interruption/resize behavior. Rendering tests check historical sizing, read-only rendering, bank poses and articulated GPU transforms. The hosting test verifies root and repository-subpath deployments, including every local module and vendored asset.
 
 The reference fixture is `test/fixtures/c49cd89-flight.json`, generated directly from the historical commit. It contains historical samples for 12, 48 and 300 birds at normal, brisk and gentle paces. Tests use it to preserve size; exact near-threat trajectories are no longer asserted because avoidance is an intentional behavior change. Browser checks cover 3D/Original 2D switching, full-size birds, playback, and console errors.
 
@@ -80,8 +92,10 @@ The reference fixture is `test/fixtures/c49cd89-flight.json`, generated directly
 - `renderer-3d.mjs`, `bird-model.mjs`: GPU renderer, sparrow geometry and articulated wing rig.
 - `vendor/three.module.min.js`, `vendor/THREE-LICENSE.txt`: pinned Three.js r170 browser build and MIT license.
 - `flock.mjs`: simulation engine, independent of the browser.
+- `formation.mjs`: offline alphabet, nearby slot assignment, formation guidance and temporary population lifecycle.
 - `server.mjs`: local static server using Node's standard library.
 - `test/flock.test.mjs`, `test/avoidance.test.mjs`: movement and clearance checks using Node's built-in test runner.
+- `test/coordination.test.mjs`, `test/formation.test.mjs`: corner recovery, turn propagation, lettering and interaction checks.
 - `test/renderer.test.mjs`, `test/fixtures/c49cd89-flight.json`: historical sizing and read-only rendering checks.
 - `test/hosting.test.mjs`: generated-site and HTTP checks.
 - `scripts/build.mjs`, `scripts/preview.mjs`: static packaging and repository-subpath preview.

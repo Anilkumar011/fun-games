@@ -125,7 +125,7 @@ function drawOriginalBirds(ctx,flock) {
     const colors=palette[b.id%palette.length];
     const flap=.6+.4*Math.sin(b.wingPhase+b.phase);
     const wing=4.1+flap*4.7;
-    ctx.save();ctx.translate(b.x,b.y);ctx.rotate(b.angle);
+    ctx.save();ctx.globalAlpha=b.opacity??1;ctx.translate(b.x,b.y);ctx.rotate(b.angle);
     ctx.scale(flock.scale,flock.scale*(1-Math.min(.13,Math.abs(b.turn)*.045)));
     // Rounded swept wings, tapered tail, body, head, and a warm feather highlight.
     ctx.fillStyle=colors[0];ctx.beginPath();
@@ -157,6 +157,6 @@ export function renderScene(ctx,flock,perspective=true,backgroundOnly=false) {
   if(backgroundOnly)return camera;
   if(!perspective){drawOriginalBirds(ctx,flock);return camera;}
   const ordered=flock.birds.map(b=>({b,p:project(camera,b.x,b.y)})).sort((a,b)=>b.p.depth-a.p.depth);
-  for(const {b,p} of ordered)drawBird(ctx,b,flock.scale,camera,flock.scale*p.scale>.65,flock.time);
+  for(const {b,p} of ordered){ctx.save();ctx.globalAlpha=b.opacity??1;drawBird(ctx,b,flock.scale,camera,flock.scale*p.scale>.65,flock.time);ctx.restore();}
   return camera;
 }

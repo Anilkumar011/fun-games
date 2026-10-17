@@ -1,6 +1,7 @@
 import { Flock, CRUISE_SPEED, capacityForViewport, parseCount, clamp } from './flock.mjs';
 import { renderScene } from './renderer.mjs';
 import { BirdRenderer } from './renderer-3d.mjs';
+import { validateWord } from './formation.mjs';
 
 const canvas=document.querySelector('#field');
 const wrap=document.querySelector('#canvas-wrap');
@@ -9,6 +10,8 @@ const countInput=document.querySelector('#count');
 const speedInput=document.querySelector('#flight-speed');
 const message=document.querySelector('#message');
 const pauseButton=document.querySelector('#pause');
+const wordInput=document.querySelector('#sky-word');
+const wordStatus=document.querySelector('#word-status');
 let flock;
 const gpuCanvas=document.querySelector('#birds-3d');
 let birdRenderer;
@@ -24,16 +27,28 @@ let frameSamples=[];
 
 function updateStats() {
   document.querySelector('#live-count').textContent=flock.birds.length.toLocaleString();
-  document.querySelector('#group-count').textContent=flock.groups.length;
-  document.querySelector('#groups-label').textContent=flock.groups.length===1?'flock':'groups gathering';
+  const formation=flock.formation;
+  document.querySelector('#group-count').textContent=formation?'1':flock.groups.length;
+  document.querySelector('#groups-label').textContent=formation?'sky word':flock.groups.length===1?'flock':'groups gathering';
   document.querySelector('#speed').textContent=(flock.cruiseSpeed/CRUISE_SPEED).toFixed(1);
   document.querySelector('#bird-scale').textContent=`${Math.round(flock.scale*100)}% size`;
+  document.querySelector('#count-help').textContent=formation
+    ?`${flock.selectedCount.toLocaleString()} selected · ${flock.birds.length.toLocaleString()} flying${flock.birds.length>flock.selectedCount?' · extra birds are temporary':''}`
+    :`1–${flock.capacity.toLocaleString()} birds · size adapts to the flock`;
+  document.querySelector('#release-word').hidden=!formation||formation.phase==='releasing';
+  const status=formation?formation.phase==='holding'?`${formation.word} · five-second display`
+    :formation.phase==='releasing'?'Returning to the flock…':`Gathering ${formation.word}…${paused?' · paused':''}`:'';
+  if(wordStatus.textContent!==status)wordStatus.textContent=status;
+  canvas.dataset.formation=formation?.phase||'none';
+  canvas.dataset.word=formation?.word||'';
+  canvas.dataset.formationProgress=String(formation?.progress||0);
+  canvas.dataset.holdTime=String(formation?.holdElapsed||0);
+  canvas.dataset.selectedCount=String(flock.selectedCount);
 }
 function syncControls(writeCount=true) {
   countInput.max=flock.capacity;
-  if(writeCount)countInput.value=flock.birds.length;
-  document.querySelector('#count-help').textContent=`1–${flock.capacity.toLocaleString()} birds · size adapts to the flock`;
-  for(const button of document.querySelectorAll('[data-count]'))button.setAttribute('aria-pressed',Number(button.dataset.count)===flock.birds.length);
+  if(writeCount)countInput.value=flock.selectedCount;
+  for(const button of document.querySelectorAll('[data-count]'))button.setAttribute('aria-pressed',Number(button.dataset.count)===flock.selectedCount);
   updateStats();
 }
 function resize() {
@@ -80,7 +95,7 @@ function changeCount(value,writeCount=false) {
     return;
   }
   countInput.removeAttribute('aria-invalid');
-  if(count!==flock.birds.length)flock.setCount(count);
+  if(count!==flock.selectedCount)flock.setCount(count);
   syncControls(writeCount);render();
   message.textContent='';
 }
@@ -88,8 +103,8 @@ countInput.addEventListener('input',()=>changeCount(countInput.value));
 countInput.addEventListener('change',()=>changeCount(countInput.value));
 countInput.addEventListener('blur',()=>{
   if(parseCount(countInput.value,flock.capacity)===null) {
-    countInput.value=flock.birds.length;countInput.removeAttribute('aria-invalid');
-    message.textContent=`Keeping ${flock.birds.length.toLocaleString()} birds in the sky.`;
+    countInput.value=flock.selectedCount;countInput.removeAttribute('aria-invalid');
+    message.textContent=`Keeping your selection of ${flock.selectedCount.toLocaleString()} birds.`;
   }
 });
 document.querySelector('#count-form').addEventListener('submit',event=>{event.preventDefault();changeCount(countInput.value);});
@@ -104,6 +119,21 @@ document.querySelector('#reset').addEventListener('click',()=>{
   flock.reset();syncControls();render();message.textContent='A fresh flight, with the same flock size and pace.';
 });
 pauseButton.addEventListener('click',()=>setPaused(!paused));
+function validateWordInput(showEmpty=false){
+  const result=validateWord(wordInput.value),showError=!result.valid&&(showEmpty||wordInput.value.trim()!=='');
+  wordInput.setAttribute('aria-invalid',String(showError));
+  document.querySelector('#form-word').disabled=!result.valid;
+  const help=document.querySelector('#word-help');
+  help.classList.toggle('error',showError);
+  help.textContent=showError?result.error:'1–6 letters · a five-second display';
+  return result;
+}
+wordInput.addEventListener('input',()=>validateWordInput());
+document.querySelector('#word-form').addEventListener('submit',event=>{
+  event.preventDefault();const result=validateWordInput(true);if(!result.valid)return;
+  flock.formWord(result.word);wordInput.value=result.word;syncControls();render();
+});
+document.querySelector('#release-word').addEventListener('click',()=>{flock.releaseWord();updateStats();});
 document.addEventListener('visibilitychange',()=>{previousTime=0;accumulator=0;});
 
 function frame(now) {

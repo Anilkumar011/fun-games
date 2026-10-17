@@ -5,7 +5,7 @@ import path from 'node:path';
 import { networkInterfaces } from 'node:os';
 
 const root = path.dirname(fileURLToPath(import.meta.url));
-const files = new Set(['index.html', 'styles.css', 'app.mjs', 'flock.mjs', 'renderer.mjs', 'renderer-3d.mjs', 'bird-model.mjs', 'vendor/three.module.min.js', 'vendor/THREE-LICENSE.txt']);
+const files = new Set(['index.html', 'styles.css', 'app.mjs', 'flock.mjs', 'formation.mjs', 'renderer.mjs', 'renderer-3d.mjs', 'bird-model.mjs', 'vendor/three.module.min.js', 'vendor/THREE-LICENSE.txt']);
 const types = { '.html': 'text/html', '.css': 'text/css', '.mjs': 'text/javascript', '.js': 'text/javascript', '.txt': 'text/plain' };
 
 export function createStaticServer({ directory = root, basePath = '/' } = {}) {

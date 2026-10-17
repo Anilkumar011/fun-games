@@ -1,3 +1,4 @@
+import {startFormation,releaseFormation,updateFormation,formationGuidance} from './formation.mjs';
 // Physics uses CSS pixels and seconds. Rendering uses the same adaptive scale.
 export const CRUISE_SPEED = 42;
 export const CATCHUP_RATIO = 1.7;
@@ -52,7 +53,7 @@ export class Flock {
     this.birds = []; this.groups = []; this.time = 0; this.nextId = 0;
     this.speedMultiplier = 1; this.cruiseSpeed = CRUISE_SPEED;
     this.grid = new Grid(); this.contactGrid = new Grid(); this.safetyGrid = new Grid();
-    this.scale = 1; this.targetScale = 1;
+    this.scale = 1; this.targetScale = 1;this.mergeTracks=new Map();
     this.reset(count);
   }
   get minDistance() { return MIN_DISTANCE * this.scale; }
@@ -74,12 +75,24 @@ export class Flock {
       phase: this.random() * Math.PI * 2, wingPhase: 0, nearest: -1, distance: Infinity,
       catchingUp: false, group: 0, mergeX: 0, mergeY: 0, merging: false };
   }
-  reset(count = this.birds.length) {
-    this.birds = []; this.time = 0;this.nextAnticipation=0;
+  reset(count = this.selectedCount??this.birds.length) {
+    this.formation=null;this.selectedCount=count;this.birds = []; this.time = 0;this.nextAnticipation=0;
     this.scale = this.desiredScale(clamp(Math.round(count) || 1, 1, this.capacity));
     this.setCount(count);
   }
-  setCount(value) {
+  formWord(text){return startFormation(this,text);}
+  releaseWord(){releaseFormation(this);}
+  setCount(value){
+    const count=clamp(Math.round(Number(value))||1,1,this.capacity);
+    this.selectedCount=count;
+    if(this.formation){
+      releaseFormation(this);
+      if(count>this.birds.length)this.setPopulation(count);
+      return count;
+    }
+    return this.setPopulation(count);
+  }
+  setPopulation(value) {
     const count = clamp(Math.round(Number(value)) || 1, 1, this.capacity);
     this.targetScale = this.desiredScale(count);
     // Shrinking wings is immediately safe; growth is eased and contact-resolved.
@@ -123,6 +136,7 @@ export class Flock {
   resize(width, height, capacity = capacityForViewport(width, height)) {
     const oldWidth=this.width, oldHeight=this.height;
     this.width=Math.max(120,width); this.height=Math.max(120,height); this.capacity=capacity;
+    this.selectedCount=Math.min(this.selectedCount,capacity);
     const reduced=this.birds.length>capacity;
     if(reduced) this.birds.length=capacity;
     for(const b of this.birds) {
@@ -136,7 +150,9 @@ export class Flock {
       this.scale *= .94;
       this.resolveContacts(20);
     }
-    this.measure(); return reduced;
+    this.measure();
+    if(this.formation){if(this.formation.phase!=='releasing')this.formWord(this.formation.word);}
+    return reduced;
   }
 
   measure() {
@@ -151,7 +167,7 @@ export class Flock {
       const b=birds[i]; parents[i]=i;
       b.headingX=Math.cos(b.angle); b.headingY=Math.sin(b.angle);
       b.nearest=-1; b.distance=Infinity; b.centerX=0;b.centerY=0;
-      b.alignX=0;b.alignY=0;b.neighbors=0;b.separateX=0;b.separateY=0;
+      b.alignX=0;b.alignY=0;b.neighbors=0;b.separateX=0;b.separateY=0;b.neighborTurn=0;b.neighborWeight=0;
       b.merging=false;totalX+=b.x;totalY+=b.y;
     }
     this.centerX=totalX/n;this.centerY=totalY/n;
@@ -165,8 +181,13 @@ export class Flock {
           if(d2<a.distance){a.distance=d2;a.nearest=j;}
           if(d2<b.distance){b.distance=d2;b.nearest=i;}
           if(d2<link2)parents[root(j)]=root(i);
+          const influence=1/(1+d2/(this.targetDistance**2*4));
+          if(!this.formation || (a.letter===b.letter&&(a.letter||a.reserveSide===b.reserveSide))){
+          a.neighborTurn+=b.turn*influence;a.neighborWeight+=influence;
+          b.neighborTurn+=a.turn*influence;b.neighborWeight+=influence;
           a.centerX+=b.x;a.centerY+=b.y;a.alignX+=b.headingX;a.alignY+=b.headingY;a.neighbors++;
           b.centerX+=a.x;b.centerY+=a.y;b.alignX+=a.headingX;b.alignY+=a.headingY;b.neighbors++;
+          }
           if(d2<sep2) {
             const d=Math.sqrt(d2)||.001;
             const strength=Math.max(0,(46*this.scale-d)/(23*this.scale))**2;
@@ -184,6 +205,15 @@ export class Flock {
         }
       }
     }
+    // Turning momentum travels through a local neighborhood; it is not a
+    // shared route or a global heading oscillator (Attanasi et al., nphys3035).
+    for(const b of birds){
+      b.followX=b.headingX;b.followY=b.headingY;b.turnSignal=b.turn;
+      if(b.neighbors){
+        b.followX=b.alignX/b.neighbors;b.followY=b.alignY/b.neighbors;
+        b.turnSignal=b.neighborTurn/b.neighborWeight;
+      }
+    }
     const groups=new Map();
     for(let i=0;i<n;i++) {
       const b=birds[i];
@@ -197,27 +227,47 @@ export class Flock {
       groups.get(b.group).push(i);
     }
     this.groups=[...groups.values()];
-    if(this.groups.length>1) {
+    for(const group of this.groups){
+      const x=group.reduce((sum,i)=>sum+birds[i].x,0)/group.length,y=group.reduce((sum,i)=>sum+birds[i].y,0)/group.length;
+      for(const i of group){birds[i].flockCenterX=x;birds[i].flockCenterY=y;}
+    }
+    if(this.groups.length>1 && !this.formation) {
       const summaries=this.groups.map(members=>({members,
-        x:members.reduce((s,i)=>s+birds[i].x,0)/members.length,
-        y:members.reduce((s,i)=>s+birds[i].y,0)/members.length}));
+        key:Math.min(...members.map(i=>birds[i].id)),
+        x:members.reduce((sum,i)=>sum+birds[i].x,0)/members.length,
+        y:members.reduce((sum,i)=>sum+birds[i].y,0)/members.length,
+        vx:members.reduce((sum,i)=>sum+birds[i].vx,0)/members.length,
+        vy:members.reduce((sum,i)=>sum+birds[i].vy,0)/members.length}));
       const main=summaries.reduce((a,b)=>a.members.length>=b.members.length?a:b);
+      const active=new Set();
       for(const group of summaries) {
         if(group===main)continue;
-        // Anchor smaller groups to the main flock: coherent detached groups no
-        // longer fly forever on their own, even when every bird has a neighbor.
-        let target=birds[main.members[0]],distance=Infinity;
-        for(const i of main.members) {
-          const d=(birds[i].x-group.x)**2+(birds[i].y-group.y)**2;
-          if(d<distance){target=birds[i];distance=d;}
+        active.add(group.key);
+        const distance=Math.hypot(main.x-group.x,main.y-group.y);
+        let track=this.mergeTracks.get(group.key);
+        if(!track){track={distance,at:this.time,stalled:0,side:group.y<main.y?-1:1};this.mergeTracks.set(group.key,track);}
+        if(this.time-track.at>=.75){
+          const elapsed=this.time-track.at,progress=(track.distance-distance)/elapsed;
+          track.stalled=progress<this.cruiseSpeed*.08?track.stalled+elapsed:Math.max(0,track.stalled-elapsed*2);
+          track.distance=distance;track.at=this.time;
         }
+        // A stale pursuit is replaced by a wider intercept, not another tug
+        // toward the same nearest bird. The pair shares this approach decision.
+        const wider=clamp((track.stalled-2)/3,0,1);
+        // Do not project past the pursuing group: that creates a moving
+        // carrot and can keep an already-ahead pair running away forever.
+        const lead=Math.min(clamp(distance/this.catchupSpeed,.4,1.6),distance*.35/(Math.hypot(main.vx,main.vy)||1));
+        const dx=main.x-group.x,dy=main.y-group.y,d=distance||1;
+        const offset=Math.min(90,this.targetDistance*2.5)*wider*track.side;
+        const targetX=clamp(main.x+main.vx*lead-dy/d*offset,MARGIN+45,this.width-MARGIN-45);
+        const targetY=clamp(main.y+main.vy*lead+dx/d*offset,MARGIN+45,this.height-MARGIN-45);
         for(const i of group.members) {
-          birds[i].merging=true;
-          birds[i].mergeX=target.x+target.vx*.4;
-          birds[i].mergeY=target.y+target.vy*.4;
+          const b=birds[i];b.merging=true;b.mergeStalled=track.stalled;
+          b.mergeX=targetX;b.mergeY=targetY;
         }
       }
-    }
+      for(const key of this.mergeTracks.keys())if(!active.has(key))this.mergeTracks.delete(key);
+    } else this.mergeTracks.clear();
   }
 
   anticipate() {
@@ -325,7 +375,8 @@ export class Flock {
     }
     this.time+=dt;
     this.cruiseSpeed+=clamp(this.speedMultiplier*CRUISE_SPEED-this.cruiseSpeed,-50*dt,50*dt);
-    this.scale+=Math.min(this.targetScale-this.scale,dt*.15);
+    updateFormation(this,dt);
+    this.scale+=clamp(this.targetScale-this.scale,-dt*.4,dt*.15);
     this.measure();
     if(this.time >= (this.nextAnticipation || 0)){
       this.anticipate();this.nextAnticipation=this.time+1/20;
@@ -333,46 +384,48 @@ export class Flock {
     const turnLimit=2.1*Math.sqrt(this.cruiseSpeed/CRUISE_SPEED);
     for(const b of this.birds) {
       const nearest=this.birds[b.nearest];
-      let sx=b.headingX*3,sy=b.headingY*3;
-      if(nearest) {
-        sx=nearest.headingX*3;sy=nearest.headingY*3;
-        if(b.neighbors) {
-          sx+=b.alignX/b.neighbors*.7+(b.centerX/b.neighbors-b.x)*.01/this.scale;
-          sy+=b.alignY/b.neighbors*.7+(b.centerY/b.neighbors-b.y)*.01/this.scale;
-        }
-        const pull=clamp((b.distance-this.targetDistance)*.055/this.scale,0,5);
-        const dx=nearest.x+nearest.vx*.2-b.x,dy=nearest.y+nearest.vy*.2-b.y;
-        const distance=Math.hypot(dx,dy)||1;
-        sx+=dx/distance*pull;sy+=dy/distance*pull;
+      // Retain the bird's momentum while gently matching nearby headings.
+      let sx=b.headingX*1.7+b.followX*4,sy=b.headingY*1.7+b.followY*4;
+      if(b.neighbors){
+        sx+=(b.centerX/b.neighbors-b.x)*.012/this.scale;
+        sy+=(b.centerY/b.neighbors-b.y)*.012/this.scale;
+      }
+      if(nearest){
+        const pull=clamp((b.distance-this.targetDistance)*.035/this.scale,0,3);
+        const dx=nearest.x-b.x,dy=nearest.y-b.y,d=Math.hypot(dx,dy)||1;
+        sx+=dx/d*pull;sy+=dy/d*pull;
         if(b.distance>this.linkDistance*.72)b.catchingUp=true;
         if(b.distance<52*this.scale)b.catchingUp=false;
       } else b.catchingUp=false;
-      if(b.merging) {
+      if(b.merging){
         const dx=b.mergeX-b.x,dy=b.mergeY-b.y,d=Math.hypot(dx,dy)||1;
-        sx=sx*.45+dx/d*5.5;sy=sy*.45+dy/d*5.5;
+        sx=sx*.16+dx/d*7;sy=sy*.16+dy/d*7;
+      } else {
+        const dx=b.flockCenterX-b.x,dy=b.flockCenterY-b.y,d=Math.hypot(dx,dy)||1;
+        const radius=Math.max(this.targetDistance*2,this.targetDistance*Math.sqrt(this.birds.length)*.7);
+        const ex=Math.min(radius,(this.width-2*MARGIN)*.42),ey=Math.min(radius,(this.height-2*MARGIN)*.38);
+        const tether=Math.max(0,Math.hypot(dx/ex,dy/ey)-1);
+        sx+=dx/d*tether*3;sy+=dy/d*tether*3;
       }
-      // A loose global tether prevents the single flock from stretching apart.
-      const dx=this.centerX-b.x,dy=this.centerY-b.y;
-      const radius=Math.max(this.targetDistance*2,this.targetDistance*Math.sqrt(this.birds.length)*.62);
-      const extentX=Math.min(radius,(this.width-2*MARGIN)*.4);
-      const extentY=Math.min(radius,(this.height-2*MARGIN)*.36);
-      const tether=Math.max(0,Math.hypot(dx/extentX,dy/extentY)-1);
-      sx+=dx/(Math.hypot(dx,dy)||1)*tether*4.5;
-      sy+=dy/(Math.hypot(dx,dy)||1)*tether*4.5;
-      sx+=b.separateX*3.2;sy+=b.separateY*3.2;
-      const wander=Math.sin(this.time*.18)*.2+Math.sin(this.time*.42+b.phase)*.035;
-      sx-=b.headingY*wander;sy+=b.headingX*wander;
+      sx+=b.separateX*2.6;sy+=b.separateY*2.6;
+      const variation=Math.sin(this.time*.22+b.phase)*.035;
+      sx-=b.headingY*variation;sy+=b.headingX*variation;
       const wallRange=Math.min(115,Math.min(this.width,this.height)*.26);
       const wall=d=>Math.max(0,1-d/wallRange)**2*11;
       sx+=wall(b.x-MARGIN)-wall(this.width-MARGIN-b.x);
       sy+=wall(b.y-MARGIN)-wall(this.height-MARGIN-b.y);
-      const avoidance=this.avoid(b,Math.atan2(sy,sx),dt);
-      const wanted=clamp(difference(avoidance.heading,b.angle)*3,-turnLimit,turnLimit);
-      b.turn+=clamp(wanted-b.turn,-9*dt,9*dt);
-      b.nextAngle=b.angle+b.turn*dt;
       const freeSpeed=(b.catchingUp||b.merging)?this.catchupSpeed:this.cruiseSpeed;
+      const guide=formationGuidance(this,b,Math.atan2(sy,sx),freeSpeed);
+      const avoidance=this.avoid(b,guide.heading,dt);
+      const urgent=(b.safetyRisk||0)>.25;
+      const carried=b.merging||urgent||guide.blend>.1?0:clamp(b.turnSignal,-1.2,1.2)*.55;
+      const arriving=guide.blend>.1;
+      const wanted=clamp(difference(avoidance.heading,b.angle)*(urgent||arriving?3:2)+carried,-turnLimit,turnLimit);
+      const response=urgent?7:arriving?6:3.5,acceleration=urgent?9:arriving?6:3.2;
+      b.turn+=clamp((wanted-b.turn)*Math.min(1,dt*response),-acceleration*dt,acceleration*dt);
+      b.nextAngle=b.angle+b.turn*dt;
       // Yielding cancels catch-up thrust before the gap becomes crowded.
-      const target=(b.safetyRisk>.001?Math.min(freeSpeed,this.cruiseSpeed):freeSpeed)*avoidance.pace;
+      const target=(b.safetyRisk>.001?Math.min(guide.speed,this.cruiseSpeed):guide.speed)*avoidance.pace;
       b.nextSpeed=b.speed+clamp(target-b.speed,-85*dt,65*dt);
     }
     for(const b of this.birds) {

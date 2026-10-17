@@ -27,6 +27,14 @@
         <div class="presets" aria-label="Flock size presets"><button type="button" data-count="12" aria-pressed="true">A few <span>12</span></button><button type="button" data-count="48" aria-pressed="false">A flock <span>48</span></button><button type="button" data-count="120" aria-pressed="false">A crowd <span>120</span></button></div>
         <div class="playback"><button type="button" id="reset" class="icon-button" title="Scatter into a new arrangement" aria-label="Reset arrangement"><span aria-hidden="true">↻</span></button><button type="button" id="pause" aria-pressed="false"><span id="pause-icon" aria-hidden="true">Ⅱ</span> <span id="pause-label">Pause</span></button></div>
       </div>
+      <form id="word-form" class="word-toolbar" novalidate>
+        <label for="sky-word">Sky letters</label>
+        <input id="sky-word" name="word" type="text" placeholder="e.g. TEST" maxlength="24" autocomplete="off" autocapitalize="characters" spellcheck="false" aria-describedby="word-help">
+        <button id="form-word" type="submit" disabled>Form word</button>
+        <button id="release-word" type="button" hidden>Release</button>
+        <span id="word-help">1–6 letters · a five-second display</span>
+        <span id="word-status" role="status" aria-live="polite"></span>
+      </form>
       <div class="canvas-wrap" id="canvas-wrap">
         <canvas id="field" role="img" aria-label="A perspective view of shaded birds banking and flapping within a bounded sky scene"></canvas>
         <canvas id="birds-3d" aria-hidden="true"></canvas>
@@ -38,7 +46,7 @@
       <div class="statusbar"><div class="metrics"><span><b id="live-count">12</b> birds</span><span><b id="group-count">1</b> <span id="groups-label">flock</span></span><span><b id="speed">1.0</b>× pace</span><span id="bird-scale">100% size</span></div><span id="count-help">1–1,200 birds · size adapts to the flock</span></div>
     </section>
     <div class="message" id="message" role="status" aria-live="polite"></div>
-    <footer><div class="rule"><span>01</span><p><strong>Find a heading</strong>Follow the nearest neighbor.</p></div><div class="rule"><span>02</span><p><strong>Make some room</strong>Keep a little space between wings.</p></div><div class="rule"><span>03</span><p><strong>Stay with the flock</strong>Gather together. Find a shared pace.</p></div><span class="footer-note">No destination.<br>Just together.</span></footer>
+    <footer><div class="rule"><span>01</span><p><strong>Find a heading</strong>Share smooth turns with nearby birds.</p></div><div class="rule"><span>02</span><p><strong>Make some room</strong>Keep a little space between wings.</p></div><div class="rule"><span>03</span><p><strong>Stay with the flock</strong>Gather together. Find a shared pace.</p></div><span class="footer-note">No destination.<br>Just together.</span></footer>
   </main>
   <script type="module" src="app.mjs"></script>
 </body>

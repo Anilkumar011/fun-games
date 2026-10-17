@@ -25,7 +25,9 @@ function observe(f,seconds){
 test('predicted head-on, crossing, and fast catch-up paths steer clear before contact',()=>{
   for(const speed of [42,105])for(const kind of ['head-on','crossing','catchup']){
     const f=new Flock(2000,1200,2,seededRandom(17));f.setSpeed(speed/42);f.cruiseSpeed=speed;
-    const gap=speed*1.6+30;
+    // A catching bird starts within the prediction horizon. At a large,
+    // already-safe gap, matching speed should not require an artificial dodge.
+    const gap=kind==='catchup'?speed*.4+23:speed*1.6+30;
     place(f.birds[0],900,600,0,kind==='catchup'?speed*1.7:speed);
     place(f.birds[1],900+gap,kind==='crossing'?600-gap:600,kind==='head-on'?Math.PI:kind==='crossing'?Math.PI/2:0,speed);
     const result=observe(f,8);

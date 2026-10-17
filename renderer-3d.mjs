@@ -24,8 +24,19 @@ export class BirdRenderer {
     this.texture=featherTexture();
     const body=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.93,metalness:0});
     const feathers=new THREE.MeshStandardMaterial({vertexColors:true,roughness:.96,metalness:0,map:this.texture,bumpMap:this.texture,bumpScale:.045,side:THREE.DoubleSide});
+    // Per-bird screen-door transparency keeps the eight instanced draw calls
+    // and opaque depth ordering, while temporary birds gently arrive/depart.
+    this.opacity=new THREE.InstancedBufferAttribute(new Float32Array(MAX_COUNT).fill(1),1);
+    this.opacity.setUsage(THREE.DynamicDrawUsage);
+    for(const material of [body,feathers])material.onBeforeCompile=shader=>{
+      shader.vertexShader=shader.vertexShader.replace('#include <common>','#include <common>\nattribute float birdOpacity;\nvarying float flockOpacity;')
+        .replace('#include <begin_vertex>','#include <begin_vertex>\nflockOpacity = birdOpacity;');
+      shader.fragmentShader=shader.fragmentShader.replace('#include <common>','#include <common>\nvarying float flockOpacity;')
+        .replace('#include <clipping_planes_fragment>','#include <clipping_planes_fragment>\nfloat fadeNoise = fract(52.9829189 * fract(dot(floor(gl_FragCoord.xy), vec2(0.06711056, 0.00583715))));\nif (flockOpacity <= fadeNoise) discard;');
+    };
     this.transforms=[];this.meshes={};this.colors=[0xffffff,0xe5dfd4,0xf6e7cc,0xd6c9ba,0xede8df].map(c=>new THREE.Color(c));
     for(const [name,geometry] of Object.entries(createBirdGeometry())){
+      geometry.setAttribute('birdOpacity',this.opacity);
       const mesh=new THREE.InstancedMesh(geometry,name==='body'?body:feathers,MAX_COUNT);
       mesh.instanceMatrix.setUsage(THREE.DynamicDrawUsage);mesh.frustumCulled=false;mesh.count=0;
       this.scene.add(mesh);this.meshes[name]=mesh;
@@ -46,11 +57,13 @@ export class BirdRenderer {
     const parts=this.parts ||= Object.entries(this.meshes);
     for(let i=0;i<flock.birds.length;i++){
       const b=flock.birds[i],matrices=birdMatrices(b,flock.time,flock.scale,this.width/2,this.height/2,this.transforms[i] ||= {});
+      this.opacity.array[i]=b.opacity??1;
       for(const [name,mesh] of parts){
         mesh.setMatrixAt(i,matrices[name]);
         if(changed)mesh.setColorAt(i,this.colors[b.id%this.colors.length]);
       }
     }
+    this.opacity.needsUpdate=true;
     for(const mesh of Object.values(this.meshes)){
       mesh.count=flock.birds.length;mesh.instanceMatrix.needsUpdate=true;
       if(changed)mesh.instanceColor.needsUpdate=true;
